@@ -1,0 +1,35 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Flash FPGA",
+            "type": "process",
+            "command": "${workspaceFolder}/bin/fpga",
+            "args": ["flash"],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "focus": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run FPGA",
+            "type": "process",
+            "command": "${workspaceFolder}/bin/fpga",
+            "args": ["run"],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "focus": false
+            },
+            "problemMatcher": []
+        }
+    ]
+}

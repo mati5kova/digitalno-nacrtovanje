@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+IMAGE="${FPGA_DOCKER_IMAGE:-jurevreca12/anvil-docker:0.2}"
+BOARD="Nexys-A7-50T"
+ANVIL_SCRIPT="/home/developer/opt/anvil/anvil.py"
+PROJECT_DIR="$(pwd -P)"
+BITSTREAM="$PROJECT_DIR/top.bit"
+
+usage() {
+  cat <<'HELP'
+Usage:
+  fpga init [project-directory] [--example NAME]
+  fpga build
+  fpga flash
+  fpga run
+  fpga shell
+
+Examples:
+  fpga init vaje04
+  fpga init vaje05 --example switches-leds
+  mkdir vaje06 && cd vaje06 && fpga init
+  fpga init --example switches-leds   # in an empty current directory
+HELP
+}
+
+error() {
+  printf 'Error: %s\n' "$*" >&2
+  exit 2
+}
+
+init() {
+  local project_arg="" example="" dest project_name container_dir
+  local -a anvil_args
+
+  while (( $# > 0 )); do
+    case "$1" in
+      --example)
+        (( $# >= 2 )) || error "--example requires a name (e.g. switches-leds)."
+        [[ -n "$2" && "$2" != -* ]] || error "--example requires a name (e.g. switches-leds)."
+        example="$2"
+        shift 2
+        ;;
+      --example=*)
+        example="${1#--example=}"
+        [[ -n "$example" ]] || error "--example requires a name."
+        shift
+        ;;
+      -h|--help)
+        usage
+        return 0
+        ;;
+      -*)
+        error "Unknown init option: $1"
+        ;;
+      *)
+        [[ -z "$project_arg" ]] || error "Specify at most one project directory."
+        project_arg="$1"
+        shift
+        ;;
+    esac
+  done
+
+  if [[ -z "$project_arg" || "$project_arg" == "." ]]; then
+    dest="$PROJECT_DIR"
+  else
+    mkdir -p -- "$project_arg"
+    dest="$(cd -- "$project_arg" && pwd -P)"
+  fi
+
+  # Do not overwrite existing project contents.
+  if [[ -n "$(ls -A -- "$dest")" ]]; then
+    error "Directory is not empty: $dest (choose another directory or an empty one)."
+  fi
+
+  project_name="$(basename -- "$dest")"
+  # Anvil derives the project name from the current directory's basename.
+  container_dir="/workspace/$project_name"
+
+  anvil_args=(init --board "$BOARD")
+  if [[ -n "$example" ]]; then
+    anvil_args+=(--example "$example")
+  fi
+
+  docker run --rm \
+    --platform linux/amd64 \
+    --mount "type=bind,source=$dest,target=$container_dir" \
+    -w "$container_dir" \
+    "$IMAGE" \
+    python3 "$ANVIL_SCRIPT" "${anvil_args[@]}"
+
+  # Remove Git repository created by Anvil.
+  rm -rf -- "$dest/.git"
+  rm -- "$dest/.gitignore"
+
+  printf '\nProject created: %s\n' "$dest"
+  if [[ "$dest" != "$PROJECT_DIR" ]]; then
+    printf 'Next: cd %q && fpga build\n' "$dest"
+  else
+    printf 'Next: fpga build\n'
+  fi
+}
+
+build() {
+  docker run --rm \
+    --platform linux/amd64 \
+    --mount "type=bind,source=$PROJECT_DIR,target=/host" \
+    -e "ANVIL_SCRIPT=$ANVIL_SCRIPT" \
+    "$IMAGE" \
+    bash -c '
+      set -euo pipefail
+      workdir="$(mktemp -d)"
+
+      tar -C /host \
+        --exclude="./build" \
+        --exclude="./.git" \
+        --exclude="./top.bit" \
+        -cf - . | tar -C "$workdir" -xf -
+
+      cd "$workdir"
+      time python3 "$ANVIL_SCRIPT" synth
+      cp build/nexys_a7_50t/top.bit /host/top.bit
+    '
+
+  printf '\nBitstream saved to: %s\n' "$BITSTREAM"
+}
+
+flash() {
+  if [[ ! -f "$BITSTREAM" ]]; then
+    printf 'Missing %s; first run: fpga build\n' "$BITSTREAM" >&2
+    exit 1
+  fi
+  if ! command -v openFPGALoader >/dev/null 2>&1; then
+    printf 'openFPGALoader is not installed or is not on PATH.\n' >&2
+    exit 1
+  fi
+  openFPGALoader -b nexys_a7_50 "$BITSTREAM"
+}
+
+shell() {
+  docker run --rm -it \
+    --platform linux/amd64 \
+    --mount "type=bind,source=$PROJECT_DIR,target=/home/designer" \
+    -w /home/designer \
+    "$IMAGE" bash
+}
+
+command="${1:-build}"
+if (( $# > 0 )); then shift; fi
+case "$command" in
+  init) init "$@" ;;
+  build) (( $# == 0 )) || error "Usage: fpga build"; build ;;
+  flash) (( $# == 0 )) || error "Usage: fpga flash"; flash ;;
+  run) (( $# == 0 )) || error "Usage: fpga run"; build; flash ;;
+  shell) (( $# == 0 )) || error "Usage: fpga shell"; shell ;;
+  -h|--help|help) usage ;;
+  *) error "Unknown command: $command (try fpga --help)" ;;
+esac

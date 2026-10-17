@@ -1,0 +1,8 @@
+build/
+tb/
+*.bit
+external/
+*.vcd
+*.log
+__pycache__/
+.DS_Store
