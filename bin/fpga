@@ -3,9 +3,10 @@ set -euo pipefail
 
 IMAGE="${FPGA_DOCKER_IMAGE:-jurevreca12/anvil-docker:0.2}"
 BOARD="Nexys-A7-50T"
+BUILD_DIR="nexys_a7_50t"
 ANVIL_SCRIPT="/home/developer/opt/anvil/anvil.py"
 PROJECT_DIR="$(pwd -P)"
-BITSTREAM="$PROJECT_DIR/top.bit"
+BITSTREAM="$PROJECT_DIR/build/$BUILD_DIR/top.bit"
 
 usage() {
   cat <<'HELP'
@@ -110,6 +111,7 @@ build() {
     bash -c '
       set -euo pipefail
       workdir="$(mktemp -d)"
+      trap '\''rm -rf "$workdir"'\'' EXIT
 
       tar -C /host \
         --exclude="./build" \
@@ -118,8 +120,18 @@ build() {
         -cf - . | tar -C "$workdir" -xf -
 
       cd "$workdir"
-      time python3 "$ANVIL_SCRIPT" synth
-      cp build/nexys_a7_50t/top.bit /host/top.bit
+
+      # Run synthesis, preserving build output even on failure.
+      status=0
+      time python3 "$ANVIL_SCRIPT" synth || status=$?
+
+      # Copy entire build directory back to the host.
+      if [[ -d build ]]; then
+        mkdir -p /host/build
+        cp -a build/. /host/build/
+      fi
+
+      exit "$status"
     '
 
   printf '\nBitstream saved to: %s\n' "$BITSTREAM"
