@@ -1,5 +1,4 @@
 build/
-tb/
 *.bit
 external/
 *.vcd

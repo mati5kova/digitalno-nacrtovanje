@@ -1,0 +1,13 @@
+{
+    "folders": [
+        { "path": "components" },
+        { "path": "ucenje" },
+
+        { "path": "vaje01" },
+        { "path": "vaje02" },
+        { "path": "vaje03" },
+        { "path": "vaje04" },
+
+        { "name": "root", "path": "." },
+    ],
+}
