@@ -2,6 +2,28 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "Testbench: current file",
+            "type": "process",
+            "command": "/bin/bash",
+            "args": [
+                "-c",
+                "set -e; input_file=\"$1\"; tb_dir=\"$2\"; source_dir=\"$2\"; if [ \"$(basename \"$source_dir\")\" = tb ]; then source_dir=\"$(dirname \"$source_dir\")\"; fi; build_dir=\"$source_dir/build/sim/$3\"; set --; for source in \"$source_dir\"/*.sv \"$source_dir\"/*.v; do if [ -f \"$source\" ] && [ \"$source\" != \"$input_file\" ]; then set -- \"$@\" -l \"$source\"; fi; done; mkdir -p \"$build_dir\"; iverilog -g2012 -Y.sv -I \"$tb_dir\" -I \"$source_dir\" -y \"$source_dir\" -o \"$build_dir/simulation.vvp\" \"$@\" \"$input_file\"; cd \"$build_dir\"; vvp simulation.vvp; for waveform in *.vcd; do if [ -f \"$waveform\" ]; then exec gtkwave \"$waveform\"; fi; done; printf '%s\\n' 'No VCD waveform found. Add $dumpfile and $dumpvars to the testbench.' >&2; exit 1",
+                "testbench",
+                "${file}",
+                "${fileDirname}",
+                "${fileBasenameNoExtension}"
+            ],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "Flash FPGA",
             "type": "process",
             "command": "${workspaceFolder}/bin/fpga",
