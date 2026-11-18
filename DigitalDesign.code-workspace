@@ -2,12 +2,14 @@
     "folders": [
         { "path": "components" },
         { "path": "ucenje" },
+        { "path": "cocotb" },
 
         { "path": "vaje01" },
         { "path": "vaje02" },
         { "path": "vaje03" },
         { "path": "vaje04" },
         { "path": "vaje05" },
+        { "path": "vaje06" },
 
         { "name": "root", "path": "." },
     ]
